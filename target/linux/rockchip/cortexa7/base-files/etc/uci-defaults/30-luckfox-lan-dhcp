@@ -1,0 +1,21 @@
+#!/bin/sh
+# 15_odhcpd (plan44) sets dhcpv4/dhcpv6/ra=disabled on LAN by default.
+# The Luckfox Pico Mini runs as a USB-gadget / Ethernet appliance — we
+# want a DHCP server on LAN so the USB-ECM host and any future Ethernet
+# peer get an address without manual setup.
+
+uci -q batch <<EOF
+set network.@device[0].ports='eth0 usb0'
+set network.lan.ipaddr='192.168.88.1'
+set network.lan.netmask='255.255.255.0'
+commit network
+set dhcp.lan.dhcpv4='server'
+set dhcp.lan.dhcpv6='server'
+set dhcp.lan.ra='server'
+set dhcp.lan.start='100'
+set dhcp.lan.limit='50'
+set dhcp.lan.leasetime='12h'
+commit dhcp
+EOF
+
+exit 0

@@ -1,0 +1,67 @@
+#!/bin/sh /etc/rc.common
+
+# Creates a CDC-ECM USB gadget on the RV1103 UDC so the Pico Mini
+# appears as a network interface when USB-C is plugged into a host.
+# Runs before netifd (START=20) so usb0 exists for br-lan.
+
+START=18
+STOP=89
+
+GADGET_DIR=/sys/kernel/config/usb_gadget/g1
+
+boot() {
+	start
+}
+
+start() {
+	[ -d /sys/kernel/config/usb_gadget ] || {
+		modprobe libcomposite 2>/dev/null
+		mount -t configfs none /sys/kernel/config 2>/dev/null
+	}
+
+	# Already configured — leave it alone (e.g. on service restart)
+	[ -s "$GADGET_DIR/UDC" ] && return 0
+
+	local udc
+	udc=$(ls /sys/class/udc 2>/dev/null | head -n1)
+	[ -z "$udc" ] && {
+		logger -t usb-gadget "no UDC available"
+		return 1
+	}
+
+	mkdir -p "$GADGET_DIR" || return 1
+	cd "$GADGET_DIR" || return 1
+
+	echo 0x1d6b > idVendor
+	echo 0x0104 > idProduct
+	echo 0x0100 > bcdDevice
+	echo 0x0200 > bcdUSB
+
+	mkdir -p strings/0x409
+	local serial
+	serial=$(cat /sys/class/net/eth0/address 2>/dev/null | tr -d ':')
+	[ -z "$serial" ] && serial=$(cat /proc/sys/kernel/random/uuid | tr -d -)
+	echo "$serial"   > strings/0x409/serialnumber
+	echo "Luckfox"   > strings/0x409/manufacturer
+	echo "Pico Mini" > strings/0x409/product
+
+	mkdir -p functions/ecm.usb0
+	mkdir -p configs/c.1/strings/0x409
+	echo "ECM" > configs/c.1/strings/0x409/configuration
+	echo 250   > configs/c.1/MaxPower
+
+	ln -s functions/ecm.usb0 configs/c.1/ecm.usb0
+
+	echo "$udc" > UDC
+}
+
+stop() {
+	[ -d "$GADGET_DIR" ] || return 0
+	[ -s "$GADGET_DIR/UDC" ] && : > "$GADGET_DIR/UDC"
+	[ -L "$GADGET_DIR/configs/c.1/ecm.usb0" ] && rm "$GADGET_DIR/configs/c.1/ecm.usb0"
+	rmdir "$GADGET_DIR/configs/c.1/strings/0x409" 2>/dev/null
+	rmdir "$GADGET_DIR/configs/c.1" 2>/dev/null
+	rmdir "$GADGET_DIR/functions/ecm.usb0" 2>/dev/null
+	rmdir "$GADGET_DIR/strings/0x409" 2>/dev/null
+	rmdir "$GADGET_DIR" 2>/dev/null
+}

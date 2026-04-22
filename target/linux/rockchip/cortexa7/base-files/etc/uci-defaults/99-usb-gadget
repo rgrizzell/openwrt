@@ -1,0 +1,3 @@
+#!/bin/sh
+/etc/init.d/usb-gadget enable
+exit 0

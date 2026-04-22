@@ -1,0 +1,14 @@
+
+. /lib/functions/uci-defaults.sh
+
+board_config_update
+
+# cortexa7 subtarget is Luckfox Pico Mini A/B only. Both boards expose
+# Ethernet via the integrated RV1103 EPHY (needs external magnetics+RJ45
+# for a physical link) and a USB-C that runs as a CDC-ECM gadget.
+# Bridge both into br-lan so the device is reachable either way.
+ucidef_set_interface_lan 'eth0 usb0'
+
+board_config_flush
+
+exit 0
